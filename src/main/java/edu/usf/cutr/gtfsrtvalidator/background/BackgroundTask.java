@@ -25,6 +25,7 @@ import edu.usf.cutr.gtfsrtvalidator.db.GTFSDB;
 import edu.usf.cutr.gtfsrtvalidator.helper.DBHelper;
 import edu.usf.cutr.gtfsrtvalidator.helper.ErrorListHelperModel;
 import edu.usf.cutr.gtfsrtvalidator.helper.TimeStampHelper;
+import edu.usf.cutr.gtfsrtvalidator.validation.entity.CheckPOSIXTime;
 import edu.usf.cutr.gtfsrtvalidator.validation.entity.LocationTypeReferenceValidator;
 import edu.usf.cutr.gtfsrtvalidator.validation.entity.CheckTripId;
 import edu.usf.cutr.gtfsrtvalidator.validation.entity.StopTimeSequanceValidator;
@@ -138,7 +139,7 @@ public class BackgroundTask implements Runnable {
             //region warnings
             //---------------------------------------------------------------------------------------
             //w001
-            TimestampValidation validateTimestamp = new TimestampValidation();
+            FeedEntityValidator validateTimestamp = new TimestampValidation();
             validateEntity(feedMessage, gtfsData, feedIteration, validateTimestamp);
             //---------------------------------------------------------------------------------------
             //endregion
@@ -157,6 +158,10 @@ public class BackgroundTask implements Runnable {
             //---------------------------------------------------------------------------------------
             FeedEntityValidator checkTripId = new CheckTripId();
             validateEntity(feedMessage, gtfsData, feedIteration, checkTripId);
+            
+            //e001
+            FeedEntityValidator checkPOSIXTime = new CheckPOSIXTime();
+            validateEntity(feedMessage, gtfsData, feedIteration, checkPOSIXTime);
 
             //e010
             FeedEntityValidator locationTypeReferenceValidator = new LocationTypeReferenceValidator();
