@@ -36,6 +36,10 @@ var paginationLog = [];
 var paginationSummary = [];
 
 var server = window.location.protocol + "//" + window.location.host;
+var clientId = sessionStorage.getItem("clientId");
+var sessionIds = [];
+var sessionStartTime = 0;
+var sessionEndTime = 0;
 
 var toggleDataOn = '<input type="checkbox" checked data-toggle="toggle" data-onstyle="success"/>';
 var toggleDataOff = '<input type="checkbox" data-toggle="toggle" data-onstyle="success"/>';
@@ -44,25 +48,28 @@ var toggleDataOff = '<input type="checkbox" data-toggle="toggle" data-onstyle="s
 for (var gtfsRtFeed in gtfsRtFeeds) {
     if (gtfsRtFeeds.hasOwnProperty(gtfsRtFeed)) {
         $.ajax({
-            url: server + "/api/gtfs-rt-feed/" + gtfsRtFeeds[gtfsRtFeed]["feedId"] + "/" + serverUpdateInterval + "/monitor",
+            url: server + "/api/gtfs-rt-feed/" + gtfsRtFeeds[gtfsRtFeed]["feedId"] + "/" + clientId + "/" + serverUpdateInterval + "/monitor",
             type: 'PUT',
             success: function (data) {
-                initializeInterface(data);
-                refresh(data["gtfsRtId"]);
+                initializeInterface(data["gtfsRtFeedModel"]);
+                refresh(data["gtfsRtFeedModel"]["gtfsRtId"]);
+
+                // SessionId's for each of the GTFS-rt-feed. On 'stop' monitoring feeds, 'Session' table 'sessionEndTime' is updated using these sessionId's.
+                sessionIds.push(data["sessionId"]);
 
                 setIntervalGetFeeds = setInterval(function () {
-                    refresh(data["gtfsRtId"])
+                    refresh(data["gtfsRtFeedModel"]["gtfsRtId"])
                 }, updateInterval);
 
                 // Get gtfs error count
-                loadGtfsErrorCount(data["gtfsFeedModel"]["feedId"]);
+                loadGtfsErrorCount(data["gtfsRtFeedModel"]["gtfsFeedModel"]["feedId"]);
             }
         });
     }
 }
 
 function loadGtfsErrorCount(gtfsFeedId) {
-    $.get(server + "/api/gtfs-feed/" + gtfsFeedId + "/errorCount").done(function (data)  {
+    $.get(server + "/api/gtfs-feed/" + gtfsFeedId + "/errorCount").done(function (data) {
         $("#gtfs-error").text(data["errorCount"]);
 
         var linkToReport = '<a href = ' + localStorage.getItem("reportURL") + encodeURIComponent(encodeURIComponent(localStorage.getItem("gtfsFileName"))) + '_out.json target="_blank">' + data["errorCount"] + ' error(s)/warning(s)</a>';
@@ -73,7 +80,8 @@ function loadGtfsErrorCount(gtfsFeedId) {
 function refresh(id) {
 
     $.get(server + "/api/gtfs-rt-feed/" + id + "/summary/pagination/" + paginationSummary[id]["currentPage"] + "/" + paginationSummary[id]["rowsPerPage"] +
-            "/log/" + hideErrors[id] + "/pagination/" + paginationLog[id]["currentPage"] + "/" + paginationLog[id]["rowsPerPage"]).done(function (data) {
+            "/log/" + hideErrors[id] + "/pagination/" + paginationLog[id]["currentPage"] + "/" + paginationLog[id]["rowsPerPage"] +
+            "/" + sessionStartTime + "/" + sessionEndTime).done(function (data) {
         updateMonitorData(id, data);
     });
 }
@@ -244,6 +252,15 @@ setIntervalClock = setInterval(getTimeElapsed, 1000);
 function stopMonitor() {
     clearInterval(setIntervalClock);
     clearInterval(setIntervalGetFeeds);
+
+    for (var sessionId in sessionIds) {
+        if (sessionIds.hasOwnProperty(sessionId)) {
+            $.ajax({
+                url: server + "/api/gtfs-rt-feed/" + sessionIds[sessionId] + "/closeSession",
+                type: 'PUT'
+            });
+        }
+    }
 }
 
 function showOrHideError(gtfsRtId, errorId) {
@@ -297,14 +314,10 @@ function updatePaginationInfo(logOrSumary, index, paginationInfo) {
     }
 }
 
-function storeFeedMessageDetails(gtfsRtId, rowId, iterationId, timestamp, occurrence) {
-    sessionStorage.setItem("gtfsRtId", gtfsRtId);
-    sessionStorage.setItem("rowId", rowId);
-    sessionStorage.setItem("iterationId", iterationId);
-    sessionStorage.setItem("timestamp", timestamp);
-    sessionStorage.setItem("occurrence", occurrence);
-}
-
 $(document).ready(function(){
     $("body").tooltip({ selector: '[data-toggle=tooltip]' });
 });
+
+window.onbeforeunload = function(){
+  stopMonitor();
+}
